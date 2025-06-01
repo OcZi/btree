@@ -133,7 +133,7 @@ public:
             inserted = _insert(root, key);
         }
 
-        if (inserted) ++size;
+        if (inserted) total_size++;
         return inserted;
     }
 

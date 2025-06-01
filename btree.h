@@ -13,12 +13,6 @@ class BTree {
     int n; // total de elementos en el arbol
     int total_size = 0;
 
-
-    void split(Node<TK> n) {
-        auto splitted = n.split();
-
-    }
-
     void _inorder(Node<TK> *n, void func(Node<TK> n)) {
         for (int i = 0; i < n->count; i++) {
             if (!n->leaf) _inorder(n->children[i]);
@@ -27,9 +21,88 @@ class BTree {
         if (!n->leaf) _inorder(n->children[n->count]);
     }
 
-public:
-    explicit BTree(int M) : root(nullptr), M(M), n(0) {
+    bool _insert_leaf(Node<TK>* node, TK key) {
+        int i;
+        // Move all left keys +1 space
+        // to create an empty slot for key param
+        // [1, 10, 12, 13, nullptr, nullptr], key = 9
+        // => [1, duplicate, 10, 12, 13, nullptr]
+        for (i = node->values - 1; i >= 0 && key < node->keys[i]; --i) {
+            node->keys[i + 1] = node->keys[i];
+        }
+
+        // => [1, 9, 10, 12, 13, nullptr]
+        node->keys[i + 1] = key;
+        ++(node->values);
+        return true;
     }
+
+    bool _insert_pivot(Node<TK>* parent, TK key) {
+        int i;
+        // Move i to the minor key (key > keys[i])
+        for (i = parent->values - 1; i >= 0 && key < parent->keys[i]; --i) {}
+        // Moving to last greater key to split
+        ++i;
+
+        auto child = parent->children[i];
+        if (child->values == M - 1) { // Full node? # keys == M - 1?
+            // Node example to split: [10, 12, 13, 14, 15], M = 6
+            // Result:
+            // left -> [10, 12, nullptr, nullptr, nullptr],
+            // promote -> [13, nullptr ,nullptr, nullptr, nullptr],
+            // right -> [14, 15, nullptr, nullptr, nullptr]
+            auto [new_parent, left_right] = child->split(M);
+
+            // Move keys/children to insert new_parent
+            for (int j = parent->values - 1; j > i; --j) {
+                parent->keys[j + 1] = parent->keys[j];
+                parent->children[j + 2] = parent->children[j];
+            }
+
+            // Inserting/merge new_parent
+            parent->keys[i] = new_parent->keys[0];
+            parent->children[i] = left_right.first;
+            parent->children[i + 1] = left_right.second;
+            parent->values = parent->values + 1;
+            parent->count = parent->count + 1;
+
+            // After promoting, checking where node to go (left or right)
+            // Index i is already to the left
+            if (key > parent->keys[i]) {
+                ++i; // Right
+            }
+        }
+
+        return _insert_leaf(parent->children[i], key);
+    }
+
+    auto _insert_full(Node<TK>* node, TK key) {
+        auto [parent, children] = node->split(M);
+        // Parent always has 1 element by split algorithm
+        if (key < parent->keys[0]) { // Check parent's element to pivot
+            _insert(children.first, key);
+        } else {
+            _insert(children.second, key);
+        }
+        return {parent, children};
+    }
+
+    bool _insert(Node<TK>* node, TK key) {
+        if (node->values == M - 1) { // insert_full
+            auto [parent, left_right] = _insert_full(node, key);
+            root = parent;
+            return true;
+        }
+
+        return node->leaf ? _insert_leaf(node, key) : _insert_pivot(node, key);
+    }
+
+    void remove(Node<TK>* node, TK key) {
+
+    }
+
+public:
+    explicit BTree(int M) : root(nullptr), M(M), n(0) {}
 
     bool search(TK key) {
         auto n = root;
@@ -50,12 +123,22 @@ public:
         return false;
     }
 
-    void insert(TK key) {
+    bool insert(TK key) {
+        bool inserted = false;
+        if (!root) {
+            root = new Node<TK>(M);
+            root->add_key(key);
+            inserted = true;
+        } else {
+            inserted = _insert(root, key);
+        }
 
+        if (inserted) ++size;
+        return inserted;
     }
 
     void remove(TK key) {
-
+        remove(root, key);
     }
 
     int height() {

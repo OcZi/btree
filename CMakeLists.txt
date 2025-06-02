@@ -12,7 +12,6 @@ add_executable(
         node.h
         main.cpp
         tester.h
-        btree_train.cpp
 )
 
 target_include_directories(${PROJECT_NAME} PUBLIC

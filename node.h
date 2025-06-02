@@ -6,6 +6,7 @@ using namespace std;
 
 template<typename TK>
 struct Node {
+    int M;
     // array de keys
     TK *keys;
     // array de punteros a hijos
@@ -20,10 +21,12 @@ struct Node {
     explicit Node(int M) {
         keys = new TK[M - 1];
         children = new Node*[M];
+        for (int i = 0; i < M; ++i) children[i] = nullptr;
         count = 0;
         values = 0;
         height = 0;
         leaf = true;
+        this->M = M;
     }
 
     template<int M>
@@ -54,20 +57,18 @@ struct Node {
     }
 
     void add_key(TK key) {
-        if (!key || !leaf && (count != values + 1)) return;
-
+        if (values >= M - 1) return;
         keys[values++] = key;
     }
 
     void add_node(Node *node) {
-        if (!node || leaf) return;
-
+        if (!node || count >= M) return;
         children[count++] = node;
     }
 
     pair<Node*, pair<Node*, Node*>> split(int M) {
         // FIXME: implementation of Node#split
-        int mid = count / 2;
+        int mid = values / 2;
         Node *left = new Node(M), *right = new Node(M), *parent = new Node(M);
 
         for (int i = 0; i < values; ++i) {
@@ -89,11 +90,10 @@ struct Node {
         parent->leaf = false;
         parent->add_node(left);
         parent->add_node(right);
-        left->height = height + 1;
-        right->height = height + 1;
 
         return {parent, {left, right}};
     }
+
 
 };
 

@@ -1,5 +1,5 @@
-/home/dev/.local/share/JetBrains/Toolbox/apps/clion/bin/cmake/linux/x64/bin/cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=/home/dev/.local/share/JetBrains/Toolbox/apps/clion/bin/ninja/linux/x64/ninja -G Ninja -S /home/dev/CLionProjects/btree -B /home/dev/CLionProjects/btree/cmake-build-debug
+"C:\Program Files\JetBrains\CLion 2025.1.1\bin\cmake\win\x64\bin\cmake.exe" -DCMAKE_BUILD_TYPE=Debug -G "MinGW Makefiles" -S C:\Users\dalev\CLionProjects\btree -B C:\Users\dalev\CLionProjects\btree\cmake-build-debug
 Compiling BTree of Algorithm and Data structures ...
--- Configuring done (0.0s)
--- Generating done (0.0s)
--- Build files have been written to: /home/dev/CLionProjects/btree/cmake-build-debug
+-- Configuring done (0.2s)
+-- Generating done (0.3s)
+-- Build files have been written to: C:/Users/dalev/CLionProjects/btree/cmake-build-debug

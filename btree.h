@@ -3,6 +3,7 @@
 #include <iostream>
 #include <vector>
 #include "node.h"
+#include <functional>
 
 using namespace std;
 
@@ -13,13 +14,15 @@ class BTree {
     int n; // total de elementos en el arbol
     int total_size = 0;
 
-    void _inorder(Node<TK> *n, void func(Node<TK> n)) {
-        for (int i = 0; i < n->count; i++) {
-            if (!n->leaf) _inorder(n->children[i]);
-            func(n);
+    void _inorder(Node<TK>* node, const std::function<void(TK)>& func) {
+        if (!node) return;
+        for (int i = 0; i < node->values; ++i) {
+            if (!node->leaf) _inorder(node->children[i], func);
+            func(node->keys[i]);
         }
-        if (!n->leaf) _inorder(n->children[n->count]);
+        if (!node->leaf) _inorder(node->children[node->values], func);
     }
+
 
     bool _insert_leaf(Node<TK>* node, TK key) {
         int i;
@@ -54,9 +57,9 @@ class BTree {
             auto [new_parent, left_right] = child->split(M);
 
             // Move keys/children to insert new_parent
-            for (int j = parent->values - 1; j > i; --j) {
+            for (int j = parent->values - 1; j >= i; --j) {
                 parent->keys[j + 1] = parent->keys[j];
-                parent->children[j + 2] = parent->children[j];
+                parent->children[j + 2] = parent->children[j + 1];
             }
 
             // Inserting/merge new_parent
@@ -64,7 +67,6 @@ class BTree {
             parent->children[i] = left_right.first;
             parent->children[i + 1] = left_right.second;
             parent->values = parent->values + 1;
-            parent->count = parent->count + 1;
 
             // After promoting, checking where node to go (left or right)
             // Index i is already to the left
@@ -76,7 +78,7 @@ class BTree {
         return _insert_leaf(parent->children[i], key);
     }
 
-    auto _insert_full(Node<TK>* node, TK key) {
+    std::pair<Node<TK>*, std::pair<Node<TK>*, Node<TK>*>> _insert_full(Node<TK>* node, TK key) {
         auto [parent, children] = node->split(M);
         // Parent always has 1 element by split algorithm
         if (key < parent->keys[0]) { // Check parent's element to pivot
@@ -98,8 +100,141 @@ class BTree {
     }
 
     void remove(Node<TK>* node, TK key) {
+    int idx = 0;
+    while (idx < node->values && key > node->keys[idx]) idx++;
 
+    if (idx < node->count && node->keys[idx] == key) {
+        if (node->leaf) {
+            for (int i = idx; i < node->count - 1; i++)
+                node->keys[i] = node->keys[i + 1];
+            node->count--;
+        } else {
+            Node<TK>* left = node->children[idx];
+            Node<TK>* right = node->children[idx + 1];
+
+            if (left->count >= M / 2) {
+                Node<TK>* current = left;
+                while (!current->leaf)
+                    current = current->children[current->count];
+                TK pred = current->keys[current->count - 1];
+                node->keys[idx] = pred;
+                remove(left, pred);
+            } else if (right->count >= M / 2) {
+                Node<TK>* current = right;
+                while (!current->leaf)
+                    current = current->children[0];
+                TK succ = current->keys[0];
+                node->keys[idx] = succ;
+                remove(right, succ);
+            } else {
+                left->keys[left->count] = node->keys[idx];
+                for (int i = 0; i < right->count; i++)
+                    left->keys[left->count + 1 + i] = right->keys[i];
+                if (!left->leaf) {
+                    for (int i = 0; i <= right->count; i++)
+                        left->children[left->count + 1 + i] = right->children[i];
+                }
+                left->count += right->count + 1;
+
+                for (int i = idx; i < node->count - 1; i++)
+                    node->keys[i] = node->keys[i + 1];
+                for (int i = idx + 1; i < node->count; i++)
+                    node->children[i] = node->children[i + 1];
+
+                node->count--;
+                delete right;
+
+                remove(left, key);
+            }
+        }
+    } else {
+        if (node->leaf) return;
+
+        bool last = (idx == node->count);
+        Node<TK>* child = node->children[idx];
+
+        if (child->count < M/2){
+            Node<TK>* leftSibling = (idx > 0) ? node->children[idx - 1] : nullptr;
+            Node<TK>* rightSibling = (idx < node->count) ? node->children[idx + 1] : nullptr;
+
+            if (leftSibling && leftSibling->count >= M / 2) {
+                for (int i = child->count; i > 0; i--)
+                    child->keys[i] = child->keys[i - 1];
+                if (!child->leaf) {
+                    for (int i = child->count + 1; i > 0; i--)
+                        child->children[i] = child->children[i - 1];
+                    child->children[0] = leftSibling->children[leftSibling->count];
+                }
+                child->keys[0] = node->keys[idx - 1];
+                node->keys[idx - 1] = leftSibling->keys[leftSibling->count - 1];
+                child->count++;
+                leftSibling->count--;
+            }
+            else if (rightSibling && rightSibling->count >= M / 2) {
+                child->keys[child->count] = node->keys[idx];
+                if (!child->leaf)
+                    child->children[child->count + 1] = rightSibling->children[0];
+
+                node->keys[idx] = rightSibling->keys[0];
+                for (int i = 1; i < rightSibling->count; i++)
+                    rightSibling->keys[i - 1] = rightSibling->keys[i];
+                if (!rightSibling->leaf) {
+                    for (int i = 1; i <= rightSibling->count; i++)
+                        rightSibling->children[i - 1] = rightSibling->children[i];
+                }
+                child->count++;
+                rightSibling->count--;
+            }
+            else {
+                // Merge con hermano
+                if (leftSibling) {
+                    leftSibling->keys[leftSibling->count] = node->keys[idx - 1];
+                    for (int i = 0; i < child->count; i++)
+                        leftSibling->keys[leftSibling->count + 1 + i] = child->keys[i];
+                    if (!child->leaf) {
+                        for (int i = 0; i <= child->count; i++)
+                            leftSibling->children[leftSibling->count + 1 + i] = child->children[i];
+                    }
+                    leftSibling->count += child->count + 1;
+
+                    for (int i = idx - 1; i < node->count - 1; i++)
+                        node->keys[i] = node->keys[i + 1];
+                    for (int i = idx; i < node->count; i++)
+                        node->children[i] = node->children[i + 1];
+                    node->count--;
+
+                    delete child;
+                    child = leftSibling;
+                    idx--;
+                }
+                else if (rightSibling) {
+                    child->keys[child->count] = node->keys[idx];
+                    for (int i = 0; i < rightSibling->count; i++)
+                        child->keys[child->count + 1 + i] = rightSibling->keys[i];
+                    if (!rightSibling->leaf) {
+                        for (int i = 0; i <= rightSibling->count; i++)
+                            child->children[child->count + 1 + i] = rightSibling->children[i];
+                    }
+                    child->count += rightSibling->count + 1;
+
+                    for (int i = idx; i < node->count - 1; i++)
+                        node->keys[i] = node->keys[i + 1];
+                    for (int i = idx + 1; i < node->count; i++)
+                        node->children[i] = node->children[i + 1];
+                    node->count--;
+
+                    delete rightSibling;
+                }
+            }
+        }
+
+        if (last && idx > node->count)
+            remove(node->children[idx - 1], key);
+        else
+            remove(node->children[idx], key);
     }
+}
+
 
 public:
     explicit BTree(int M) : root(nullptr), M(M), n(0) {}
@@ -108,7 +243,7 @@ public:
         auto n = root;
         while (n) {
             int i = 0;
-            for (; i < n->count; ++i) {
+            for (; i < n->values; ++i) {
                 auto ckey = n->keys[i];
                 if (key == ckey) {
                     return true;
@@ -138,6 +273,7 @@ public:
     }
 
     void remove(TK key) {
+        if (!root) return;
         remove(root, key);
     }
 
@@ -147,11 +283,12 @@ public:
 
     string toString(const string &sep) {
         string base;
-        auto fun = [&base](Node<TK> *node) {
-            if (!base.empty()) base.push_back(*" ");
-            base.push_back(to_string(node->keys));
+        auto fun = [&base, &sep](TK val) {
+            if (!base.empty()) base += sep;
+            base += to_string(val);
         };
         _inorder(root, fun);
+        cout << base << endl;
         return base;
     }
 
